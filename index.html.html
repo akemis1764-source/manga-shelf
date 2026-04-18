@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>本棚 — コレクション管理</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600;800&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #0f0e0b;
+    --bg2: #1a1814;
+    --bg3: #242018;
+    --panel: #1e1c17;
+    --border: #3a3428;
+    --border2: #4a4238;
+    --accent: #c8a96e;
+    --accent2: #e8c88e;
+    --accent-dim: #8a7048;
+    --text: #e8e0d0;
+    --text2: #a89880;
+    --text3: #6a5e4e;
+    --red: #c85848;
+    --green: #7aaa6a;
+    --blue: #6898c8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Shippori Mincho', serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text3); font-size: 13px; font-weight: 400; margin-left: 8px; font-family: 'Noto Sans JP', sans-serif; }
+
+  .search-wrap { flex: 1; max-width: 480px; position: relative; }
+
+  #searchInput {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 36px 8px 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  #searchInput:focus { border-color: var(--accent-dim); }
+  #searchInput::placeholder { color: var(--text3); }
+
+  .search-icon { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); font-size: 15px; pointer-events: none; }
+
+  .header-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+
+  .btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text2);
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent-dim); color: var(--accent); background: var(--bg2); }
+  .btn.primary { background: var(--accent); color: #1a1208; border-color: var(--accent); font-weight: 700; }
+  .btn.primary:hover { background: var(--accent2); }
+  .btn.danger { color: var(--red); }
+  .btn.danger:hover { border-color: var(--red); background: rgba(200,88,72,0.1); }
+  .btn.sync { color: var(--green); }
+  .btn.sync:hover { border-color: var(--green); background: rgba(122,170,106,0.1); }
+
+  .sync-status {
+    font-size: 11px;
+    color: var(--text3);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .sync-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text3);
+  }
+  .sync-dot.online { background: var(--green); }
+  .sync-dot.saving { background: var(--accent); animation: pulse 0.8s infinite; }
+  @keyframes pulse { 50% { opacity: 0.3; } }
+
+  /* ── Layout ── */
+  .layout { display: flex; height: calc(100vh - 56px); }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-section { padding: 0 12px 16px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+
+  .sidebar-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.12em;
+    color: var(--text3); text-transform: uppercase; padding: 8px 4px 6px;
+  }
+
+  .filter-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 5px; cursor: pointer;
+    font-size: 13px; color: var(--text2); transition: all 0.15s;
+  }
+  .filter-item:hover { background: var(--bg3); color: var(--text); }
+  .filter-item.active { background: rgba(200,169,110,0.12); color: var(--accent); }
+  .filter-item .count {
+    margin-left: auto; font-size: 11px; color: var(--text3);
+    background: var(--bg3); padding: 1px 6px; border-radius: 10px;
+  }
+  .filter-item.active .count { background: rgba(200,169,110,0.2); color: var(--accent-dim); }
+
+  .genre-tag-sidebar {
+    display: inline-flex; align-items: center; gap: 6px; width: 100%;
+    padding: 5px 8px; border-radius: 5px; cursor: pointer;
+    font-size: 12px; color: var(--text2); transition: all 0.15s;
+  }
+  .genre-tag-sidebar:hover { background: var(--bg3); color: var(--text); }
+  .genre-tag-sidebar.active { color: var(--accent); }
+  .genre-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .star-filter { display: flex; gap: 4px; padding: 4px 8px; }
+  .star-btn {
+    background: none; border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text3); font-size: 12px; padding: 3px 8px; cursor: pointer; transition: all 0.15s;
+  }
+  .star-btn:hover, .star-btn.active { border-color: var(--accent-dim); color: var(--accent); background: rgba(200,169,110,0.1); }
+
+  /* ── Main ── */
+  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+
+  .toolbar {
+    padding: 12px 20px; display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px solid var(--border); background: var(--bg2); flex-shrink: 0;
+  }
+  .result-count { font-size: 13px; color: var(--text3); }
+  .result-count strong { color: var(--accent); }
+
+  .view-toggle { display: flex; gap: 4px; margin-left: auto; }
+  .view-btn {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text3); padding: 5px 10px; cursor: pointer; font-size: 14px; transition: all 0.15s;
+  }
+  .view-btn.active { border-color: var(--accent-dim); color: var(--accent); background: rgba(200,169,110,0.1); }
+
+  .sort-select {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text2); font-size: 13px; font-family: 'Noto Sans JP', sans-serif;
+    padding: 5px 10px; cursor: pointer; outline: none;
+  }
+
+  /* ── Grid view ── */
+  #mangaGrid {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+    align-content: start;
+  }
+
+  .manga-card {
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; cursor: pointer; transition: all 0.2s; position: relative;
+  }
+  .manga-card:hover {
+    border-color: var(--accent-dim); transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  }
+  .card-spine { height: 6px; }
+  .card-body { padding: 10px 10px 8px; }
+  .card-title {
+    font-size: 12px; font-weight: 500; line-height: 1.4; color: var(--text);
+    margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical; overflow: hidden; min-height: 50px;
+  }
+  .card-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .vol-badge {
+    font-size: 11px; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 6px; color: var(--text2);
+  }
+  .vol-badge.complete { border-color: var(--green); color: var(--green); }
+  .vol-badge.partial { border-color: var(--accent-dim); color: var(--accent); }
+  .star-display { font-size: 11px; color: var(--accent); }
+  .genre-chip { font-size: 10px; padding: 1px 5px; border-radius: 3px; font-weight: 500; }
+
+  /* ── List view ── */
+  #mangaGrid.list-view {
+    grid-template-columns: 1fr; gap: 2px; padding: 12px 20px;
+  }
+  #mangaGrid.list-view .manga-card {
+    display: flex; align-items: center; gap: 0; border-radius: 5px;
+  }
+  #mangaGrid.list-view .card-spine {
+    width: 5px; height: auto; align-self: stretch; flex-shrink: 0;
+  }
+  #mangaGrid.list-view .card-body {
+    flex: 1; display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  }
+  #mangaGrid.list-view .card-title {
+    min-height: unset; -webkit-line-clamp: 1; flex: 1; margin-bottom: 0; font-size: 13px;
+  }
+  #mangaGrid.list-view .card-meta { margin-left: auto; flex-wrap: nowrap; gap: 6px; }
+
+  /* ── Empty / Login ── */
+  .empty-state, .login-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px; gap: 16px; color: var(--text3);
+  }
+  .empty-icon, .login-icon { font-size: 48px; opacity: 0.4; }
+  .empty-title, .login-title { font-family: 'Shippori Mincho', serif; font-size: 18px; color: var(--text2); }
+  .empty-sub, .login-sub { font-size: 13px; text-align: center; line-height: 1.7; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 200;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.hidden { display: none; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border2); border-radius: 12px;
+    width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  }
+  .modal-header {
+    padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .modal-spine { width: 8px; border-radius: 3px; align-self: stretch; flex-shrink: 0; }
+  .modal-title-wrap { flex: 1; }
+  .modal-title {
+    font-family: 'Shippori Mincho', serif; font-size: 18px; font-weight: 600;
+    color: var(--text); line-height: 1.4;
+  }
+  .modal-close {
+    background: none; border: none; color: var(--text3); font-size: 20px;
+    cursor: pointer; padding: 2px; line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+  .field-group { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; }
+  .field-input, .field-textarea, .field-select {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-size: 14px; font-family: 'Noto Sans JP', sans-serif;
+    padding: 9px 12px; outline: none; width: 100%; transition: border-color 0.2s;
+  }
+  .field-input:focus, .field-textarea:focus, .field-select:focus { border-color: var(--accent-dim); }
+  .field-textarea { resize: vertical; min-height: 80px; }
+
+  .vol-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 6px; max-height: 200px; overflow-y: auto; padding: 4px;
+  }
+  .vol-cell {
+    aspect-ratio: 1; border-radius: 4px; border: 1px solid var(--border);
+    background: var(--bg3); cursor: pointer; display: flex; align-items: center;
+    justify-content: center; font-size: 12px; color: var(--text3);
+    transition: all 0.15s; user-select: none;
+  }
+  .vol-cell:hover { border-color: var(--accent-dim); color: var(--accent); }
+  .vol-cell.owned { background: rgba(200,169,110,0.2); border-color: var(--accent-dim); color: var(--accent); font-weight: 700; }
+
+  .vol-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .vol-max-input {
+    width: 80px; background: var(--bg3); border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-size: 13px; font-family: 'Noto Sans JP', sans-serif; padding: 6px 10px; outline: none;
+  }
+
+  .star-picker { display: flex; gap: 6px; }
+  .star-pick { font-size: 22px; cursor: pointer; transition: transform 0.1s; line-height: 1; }
+  .star-pick:hover { transform: scale(1.2); }
+  .star-pick.active { filter: none; }
+  .star-pick.inactive { opacity: 0.25; }
+
+  .genre-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+  .genre-pick-btn {
+    font-size: 12px; padding: 4px 10px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--bg3); color: var(--text2);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .genre-pick-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+  .genre-pick-btn.active { border-color: var(--accent); background: rgba(200,169,110,0.15); color: var(--accent); font-weight: 600; }
+
+  .modal-footer {
+    padding: 16px 24px; border-top: 1px solid var(--border);
+    display: flex; gap: 8px; justify-content: flex-end;
+  }
+
+  .import-textarea {
+    width: 100%; height: 300px; background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 13px;
+    font-family: 'Noto Sans JP', monospace; padding: 12px; outline: none; resize: vertical;
+  }
+
+  /* ── Setup modal ── */
+  .setup-steps { display: flex; flex-direction: column; gap: 16px; }
+  .setup-step { display: flex; gap: 12px; align-items: flex-start; }
+  .step-num {
+    background: var(--accent); color: #1a1208; width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;
+  }
+  .step-content { flex: 1; font-size: 13px; color: var(--text2); line-height: 1.7; }
+  .step-content a { color: var(--accent); }
+  .step-content code {
+    background: var(--bg3); padding: 2px 6px; border-radius: 3px; font-size: 12px; color: var(--accent);
+  }
+
+  /* ── Loading ── */
+  .loading-overlay {
+    position: fixed; inset: 0; background: var(--bg); z-index: 300;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  }
+  .loading-overlay.hidden { display: none; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--text2); }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--panel);
+    border: 1px solid var(--border2); border-radius: 8px; padding: 12px 18px;
+    font-size: 13px; color: var(--text); z-index: 400;
+    transform: translateY(20px); opacity: 0; transition: all 0.25s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.success { border-color: var(--green); }
+  #toast.error { border-color: var(--red); }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  @media (max-width: 700px) {
+    .sidebar { display: none; }
+    #mangaGrid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; padding: 12px; }
+    header { gap: 8px; padding: 0 10px; }
+    .header-actions { gap: 4px; }
+    .btn { font-size: 11px; padding: 6px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">本棚を開いています…</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">本棚<span id="headerCount"></span></div>
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="タイトル検索…">
+    <span class="search-icon">🔍</span>
+  </div>
+  <div class="header-actions">
+    <div class="sync-status" id="syncStatus">
+      <span class="sync-dot" id="syncDot"></span>
+      <span id="syncText">未接続</span>
+    </div>
+    <button class="btn" id="loginBtn" onclick="handleAuth()">Googleログイン</button>
+    <button class="btn" onclick="openImport()">＋ インポート</button>
+    <button class="btn" onclick="exportLocal()">エクスポート</button>
+    <button class="btn" onclick="openAddSingle()">＋ 1作品追加</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">表示</div>
+      <div class="filter-item active" onclick="setFilter('all', this)">
+        <span>📚</span> すべて <span class="count" id="cnt-all">0</span>
+      </div>
+      <div class="filter-item" onclick="setFilter('complete', this)">
+        <span>✅</span> 全巻あり <span class="count" id="cnt-complete">0</span>
+      </div>
+      <div class="filter-item" onclick="setFilter('partial', this)">
+        <span>📖</span> 途中 <span class="count" id="cnt-partial">0</span>
+      </div>
+      <div class="filter-item" onclick="setFilter('unset', this)">
+        <span>❓</span> 巻数未設定 <span class="count" id="cnt-unset">0</span>
+      </div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">評価</div>
+      <div class="star-filter" id="starFilter">
+        <button class="star-btn active" data-star="0" onclick="setStarFilter(0, this)">全て</button>
+        <button class="star-btn" data-star="5" onclick="setStarFilter(5, this)">★5</button>
+        <button class="star-btn" data-star="4" onclick="setStarFilter(4, this)">★4</button>
+        <button class="star-btn" data-star="3" onclick="setStarFilter(3, this)">★3</button>
+        <button class="star-btn" data-star="2" onclick="setStarFilter(2, this)">★2</button>
+        <button class="star-btn" data-star="1" onclick="setStarFilter(1, this)">★1</button>
+      </div>
+    </div>
+    <div class="sidebar-section" style="border-bottom:none;">
+      <div class="sidebar-label">ジャンル</div>
+      <div id="genreList"></div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="toolbar">
+      <span class="result-count" id="resultCount"></span>
+      <select class="sort-select" id="sortSelect" onchange="render()">
+        <option value="title">タイトル順</option>
+        <option value="rating_desc">評価高い順</option>
+        <option value="updated">更新順</option>
+        <option value="added">追加順</option>
+      </select>
+      <div class="view-toggle">
+        <button class="view-btn active" id="gridBtn" onclick="setView('grid')">⊞</button>
+        <button class="view-btn" id="listBtn" onclick="setView('list')">≡</button>
+      </div>
+    </div>
+    <div id="mangaGrid"></div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay hidden" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-spine" id="editModalSpine"></div>
+      <div class="modal-title-wrap"><div class="modal-title" id="editModalTitle">作品詳細</div></div>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field-group">
+        <div class="field-label">タイトル</div>
+        <input type="text" class="field-input" id="editTitle">
+      </div>
+      <div class="field-group">
+        <div class="field-label">作者</div>
+        <input type="text" class="field-input" id="editAuthor" placeholder="任意">
+      </div>
+      <div class="field-group">
+        <div class="field-label">ジャンル（複数選択可）</div>
+        <div class="genre-picker" id="editGenrePicker"></div>
+        <input type="text" class="field-input" id="editGenreCustom" placeholder="カスタムジャンルを入力してEnter" style="margin-top:6px;">
+      </div>
+      <div class="field-group">
+        <div class="field-label">評価</div>
+        <div class="star-picker" id="editStarPicker"></div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">所持巻数</div>
+        <div class="vol-controls" style="margin-bottom:8px;">
+          <span style="font-size:13px;color:var(--text2);">全</span>
+          <input type="number" class="vol-max-input" id="editVolMax" min="1" max="999" placeholder="巻数">
+          <span style="font-size:13px;color:var(--text2);">巻</span>
+          <button class="btn" onclick="selectAllVols()">全選択</button>
+          <button class="btn" onclick="clearAllVols()">クリア</button>
+          <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:4px;margin-left:auto;">
+            <input type="checkbox" id="editComplete"> 完結
+          </label>
+        </div>
+        <div class="vol-grid" id="editVolGrid"></div>
+      </div>
+      <div class="field-group">
+        <div class="field-label">メモ</div>
+        <textarea class="field-textarea" id="editMemo" placeholder="感想、メモなど…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn danger" onclick="deleteManga()">削除</button>
+      <button class="btn" onclick="closeEditModal()">キャンセル</button>
+      <button class="btn primary" onclick="saveManga()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay hidden" id="importModal">
+  <div class="modal" style="max-width:600px;">
+    <div class="modal-header">
+      <div class="modal-title-wrap"><div class="modal-title">作品リストをインポート</div></div>
+      <button class="modal-close" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;">
+        1行につき1作品のテキストを貼り付けてください。既存の作品は上書きされません（新規のみ追加）。
+      </div>
+      <textarea class="import-textarea" id="importText" placeholder="鬼滅の刃&#10;進撃の巨人&#10;ワンピース&#10;…"></textarea>
+      <div id="importPreview" style="font-size:12px;color:var(--text3);"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeImport()">キャンセル</button>
+      <button class="btn primary" onclick="doImport()">インポート実行</button>
+    </div>
+  </div>
+</div>
+
+<!-- Setup Modal -->
+<div class="modal-overlay hidden" id="setupModal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-header">
+      <div class="modal-title-wrap"><div class="modal-title">Google Drive 初期設定</div></div>
+      <button class="modal-close" onclick="closeSetup()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text2);line-height:1.7;margin-bottom:8px;">
+        Google Driveで同期するには、Google CloudでAPIキーを取得する必要があります（無料・一度だけ）。
+      </div>
+      <div class="setup-steps">
+        <div class="setup-step">
+          <span class="step-num">1</span>
+          <div class="step-content">
+            <a href="https://console.cloud.google.com/" target="_blank">Google Cloud Console</a> を開き、新しいプロジェクトを作成（名前は「本棚」などでOK）
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-num">2</span>
+          <div class="step-content">
+            左メニュー「APIとサービス」→「ライブラリ」で <strong>Google Drive API</strong> を検索して「有効にする」
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-num">3</span>
+          <div class="step-content">
+            「APIとサービス」→「OAuth同意画面」→ 外部を選択 → アプリ名に「本棚」→ 自分のメールを入力 → テストユーザーに自分のGmailを追加 → 保存
+          </div>
+        </div>
+        <div class="setup-step">
+          <span class="step-num">4</span>
+          <div class="step-content">
+            「APIとサービス」→「認証情報」→「認証情報を作成」→「OAuthクライアントID」<br>
+            アプリケーションの種類: <strong>ウェブ アプリケーション</strong><br>
+            承認済みJavaScriptオリジン: このファイルを開くURL（例: <code>http://localhost</code> やGitHub PagesのURL）<br>
+            ローカルファイルとして開く場合は <code>null</code> を追加<br>
+            → 作成 → 表示される <strong>クライアントID</strong> をコピー
+          </div>
+        </div>
+      </div>
+
+      <div class="field-group" style="margin-top:16px;">
+        <div class="field-label">クライアントID を貼り付け</div>
+        <input type="text" class="field-input" id="setupClientId" placeholder="xxxxx.apps.googleusercontent.com">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeSetup()">キャンセル</button>
+      <button class="btn primary" onclick="saveClientId()">保存してログイン</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const DRIVE_FILE_NAME = 'manga-shelf-data.json';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+let CLIENT_ID = localStorage.getItem('manga_shelf_client_id') || '';
+let accessToken = '';
+let driveFileId = '';
+let syncDirty = false;
+let syncTimer = null;
+
+// ═══════════════════════════════════════════════
+// IndexedDB (local cache)
+// ═══════════════════════════════════════════════
+const DB_NAME = 'MangaShelf';
+const DB_VER = 1;
+const STORE = 'mangas';
+let db;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        const s = d.createObjectStore(STORE, { keyPath: 'id' });
+        s.createIndex('title', 'title', { unique: false });
+        s.createIndex('genre', 'genres', { unique: false, multiEntry: true });
+        s.createIndex('rating', 'rating', { unique: false });
+        s.createIndex('added', 'added', { unique: false });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror = e => rej(e);
+  });
+}
+
+function dbGetAll() {
+  return new Promise((r, j) => {
+    const tx = db.transaction(STORE, 'readonly');
+    tx.objectStore(STORE).getAll().onsuccess = e => r(e.target.result);
+    tx.onerror = j;
+  });
+}
+
+function dbPut(item) {
+  return new Promise((r, j) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).put(item);
+    tx.oncomplete = r; tx.onerror = j;
+  });
+}
+
+function dbPutMany(items) {
+  return new Promise((r, j) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const s = tx.objectStore(STORE);
+    items.forEach(i => s.put(i));
+    tx.oncomplete = r; tx.onerror = j;
+  });
+}
+
+function dbDelete(id) {
+  return new Promise((r, j) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).delete(id);
+    tx.oncomplete = r; tx.onerror = j;
+  });
+}
+
+function dbClear() {
+  return new Promise((r, j) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = r; tx.onerror = j;
+  });
+}
+
+// ═══════════════════════════════════════════════
+// Google Drive
+// ═══════════════════════════════════════════════
+function handleAuth() {
+  if (!CLIENT_ID) { openSetup(); return; }
+
+  const tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: SCOPES,
+    callback: async (resp) => {
+      if (resp.error) {
+        showToast('ログインに失敗しました: ' + resp.error, 'error');
+        return;
+      }
+      accessToken = resp.access_token;
+      document.getElementById('loginBtn').textContent = 'ログイン中 ✓';
+      document.getElementById('loginBtn').onclick = handleLogout;
+      setSyncStatus('online', '同期済み');
+      showToast('Googleログイン成功 ✓', 'success');
+      await pullFromDrive();
+    },
+  });
+  tokenClient.requestAccessToken();
+}
+
+function handleLogout() {
+  if (accessToken) {
+    google.accounts.oauth2.revoke(accessToken);
+  }
+  accessToken = '';
+  driveFileId = '';
+  document.getElementById('loginBtn').textContent = 'Googleログイン';
+  document.getElementById('loginBtn').onclick = handleAuth;
+  setSyncStatus('', '未接続');
+  showToast('ログアウトしました');
+}
+
+function setSyncStatus(state, text) {
+  const dot = document.getElementById('syncDot');
+  const txt = document.getElementById('syncText');
+  dot.className = 'sync-dot ' + state;
+  txt.textContent = text;
+}
+
+async function driveFind() {
+  const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  const data = await res.json();
+  return data.files && data.files.length > 0 ? data.files[0].id : null;
+}
+
+async function driveRead(fileId) {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+  return res.json();
+}
+
+async function driveCreate(content) {
+  const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+  const body = new FormData();
+  body.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+  body.append('file', new Blob([JSON.stringify(content)], { type: 'application/json' }));
+
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body
+  });
+  const data = await res.json();
+  return data.id;
+}
+
+async function driveUpdate(fileId, content) {
+  await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(content)
+  });
+}
+
+async function pullFromDrive() {
+  try {
+    setSyncStatus('saving', '読み込み中…');
+    driveFileId = await driveFind();
+
+    if (driveFileId) {
+      const remoteData = await driveRead(driveFileId);
+      if (Array.isArray(remoteData) && remoteData.length > 0) {
+        // Merge: remote wins for same id, local-only kept
+        const remoteMap = new Map(remoteData.map(m => [m.id, m]));
+        const localData = await dbGetAll();
+        const localOnlyMap = new Map();
+        localData.forEach(m => { if (!remoteMap.has(m.id)) localOnlyMap.set(m.id, m); });
+
+        const merged = [...remoteData, ...localOnlyMap.values()];
+        await dbClear();
+        await dbPutMany(merged);
+        allMangas = merged;
+
+        // If local had extras, push merged back
+        if (localOnlyMap.size > 0) {
+          await driveUpdate(driveFileId, merged);
+        }
+
+        showToast(`Driveから${remoteData.length}件を読み込みました ✓`, 'success');
+      }
+    } else {
+      // No remote file, push local data up
+      const localData = await dbGetAll();
+      if (localData.length > 0) {
+        driveFileId = await driveCreate(localData);
+        showToast(`Driveにデータをアップロードしました ✓`, 'success');
+      } else {
+        driveFileId = await driveCreate([]);
+      }
+    }
+
+    setSyncStatus('online', '同期済み');
+    updateCounts();
+    render();
+  } catch (err) {
+    console.error('Drive pull error:', err);
+    setSyncStatus('', 'エラー');
+    showToast('Drive同期エラー: ' + err.message, 'error');
+  }
+}
+
+async function pushToDrive() {
+  if (!accessToken || !driveFileId) return;
+  try {
+    setSyncStatus('saving', '保存中…');
+    await driveUpdate(driveFileId, allMangas);
+    setSyncStatus('online', '同期済み');
+  } catch (err) {
+    console.error('Drive push error:', err);
+    setSyncStatus('', 'エラー');
+    showToast('Drive同期エラー: ' + err.message, 'error');
+  }
+}
+
+function schedulePush() {
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(pushToDrive, 2000); // debounce 2s
+}
+
+// ═══════════════════════════════════════════════
+// Setup modal
+// ═══════════════════════════════════════════════
+function openSetup() { document.getElementById('setupModal').classList.remove('hidden'); }
+function closeSetup() { document.getElementById('setupModal').classList.add('hidden'); }
+
+function saveClientId() {
+  const id = document.getElementById('setupClientId').value.trim();
+  if (!id) { showToast('クライアントIDを入力してください', 'error'); return; }
+  CLIENT_ID = id;
+  localStorage.setItem('manga_shelf_client_id', id);
+  closeSetup();
+  showToast('設定保存しました。ログインします…', 'success');
+  setTimeout(handleAuth, 500);
+}
+
+// ═══════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════
+let allMangas = [];
+let currentFilter = 'all';
+let currentStarFilter = 0;
+let currentGenreFilter = '';
+let currentView = 'grid';
+let editingId = null;
+let selectedVols = new Set();
+
+const GENRES = ['少年','少女','青年','女性','SF','ファンタジー','恋愛','ラブコメ','ホラー','ミステリー','バトル','スポーツ','日常','歴史','料理','ギャグ','エロ','BL','百合','異世界','学園','ヤンキー','サスペンス'];
+
+const SPINE_COLORS = [
+  '#6a3a22','#2a5a3a','#2a3a6a','#5a3a6a','#6a5a22',
+  '#3a5a5a','#6a2a3a','#3a6a22','#5a4a2a','#2a4a5a','#6a4a2a','#3a2a6a'
+];
+
+function getSpineColor(title) {
+  let hash = 0;
+  for (const c of title) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
+  return SPINE_COLORS[Math.abs(hash) % SPINE_COLORS.length];
+}
+
+// ═══════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════
+async function init() {
+  await openDB();
+  allMangas = await dbGetAll();
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  buildGenreSidebar();
+  updateCounts();
+  render();
+
+  document.getElementById('searchInput').addEventListener('input', render);
+  document.getElementById('editVolMax').addEventListener('input', rebuildVolGrid);
+  document.getElementById('editGenreCustom').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addCustomGenre(e.target.value.trim()); }
+  });
+  document.getElementById('importText').addEventListener('input', updateImportPreview);
+
+  // Modal close on overlay click
+  ['editModal','importModal','setupModal'].forEach(id => {
+    document.getElementById(id).addEventListener('click', e => {
+      if (e.target.id === id) document.getElementById(id).classList.add('hidden');
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════════
+function getFiltered() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const sort = document.getElementById('sortSelect').value;
+
+  let list = allMangas.filter(m => {
+    if (q && !m.title.toLowerCase().includes(q) && !(m.author||'').toLowerCase().includes(q)) return false;
+    if (currentFilter === 'complete' && !m.complete) return false;
+    if (currentFilter === 'partial' && (m.complete || (!m.volMax && (!m.ownedVols || m.ownedVols.length === 0)))) return false;
+    if (currentFilter === 'unset' && m.volMax) return false;
+    if (currentStarFilter > 0 && m.rating !== currentStarFilter) return false;
+    if (currentGenreFilter && !(m.genres||[]).includes(currentGenreFilter)) return false;
+    return true;
+  });
+
+  list.sort((a, b) => {
+    if (sort === 'title') return a.title.localeCompare(b.title, 'ja');
+    if (sort === 'rating_desc') return (b.rating||0) - (a.rating||0);
+    if (sort === 'updated') return (b.updated||0) - (a.updated||0);
+    if (sort === 'added') return (b.added||0) - (a.added||0);
+    return 0;
+  });
+  return list;
+}
+
+function render() {
+  const list = getFiltered();
+  const grid = document.getElementById('mangaGrid');
+  document.getElementById('resultCount').innerHTML = `<strong>${list.length.toLocaleString()}</strong> 作品`;
+  document.getElementById('headerCount').textContent = ` — ${allMangas.length.toLocaleString()}作品`;
+
+  grid.className = currentView === 'list' ? 'list-view' : '';
+  grid.id = 'mangaGrid';
+
+  if (list.length === 0) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">
+      <div class="empty-icon">📭</div>
+      <div class="empty-title">作品が見つかりません</div>
+      <div class="empty-sub">検索条件を変えるか、「＋ インポート」から追加してください</div>
+    </div>`;
+    return;
+  }
+
+  const frag = document.createDocumentFragment();
+  list.forEach(m => frag.appendChild(createCard(m)));
+  grid.innerHTML = '';
+  grid.appendChild(frag);
+}
+
+function createCard(m) {
+  const color = getSpineColor(m.title);
+  const ownedCount = (m.ownedVols || []).length;
+  const total = m.volMax || 0;
+
+  let volLabel = '', volClass = '';
+  if (m.complete) { volLabel = '全巻'; volClass = 'complete'; }
+  else if (total > 0) { volLabel = `${ownedCount}/${total}巻`; volClass = ownedCount === total ? 'complete' : 'partial'; }
+  else if (ownedCount > 0) { volLabel = `${ownedCount}冊`; volClass = 'partial'; }
+
+  const stars = m.rating ? '★'.repeat(m.rating) : '';
+  const genreHtml = (m.genres||[]).slice(0,2).map(g =>
+    `<span class="genre-chip" style="background:${color}22;color:${color};border:1px solid ${color}44;">${g}</span>`
+  ).join('');
+
+  const div = document.createElement('div');
+  div.className = 'manga-card';
+  div.onclick = () => openEdit(m.id);
+  div.innerHTML = `
+    <div class="card-spine" style="background:${color};"></div>
+    <div class="card-body">
+      <div class="card-title">${escHtml(m.title)}</div>
+      <div class="card-meta">
+        ${volLabel ? `<span class="vol-badge ${volClass}">${volLabel}</span>` : ''}
+        ${stars ? `<span class="star-display">${stars}</span>` : ''}
+        ${genreHtml}
+      </div>
+    </div>`;
+  return div;
+}
+
+// ═══════════════════════════════════════════════
+// Counts & sidebar
+// ═══════════════════════════════════════════════
+function updateCounts() {
+  document.getElementById('cnt-all').textContent = allMangas.length.toLocaleString();
+  document.getElementById('cnt-complete').textContent = allMangas.filter(m => m.complete).length.toLocaleString();
+  document.getElementById('cnt-partial').textContent = allMangas.filter(m => !m.complete && m.volMax && (m.ownedVols||[]).length < m.volMax).length.toLocaleString();
+  document.getElementById('cnt-unset').textContent = allMangas.filter(m => !m.volMax).length.toLocaleString();
+  buildGenreSidebar();
+}
+
+function buildGenreSidebar() {
+  const gc = {};
+  allMangas.forEach(m => (m.genres||[]).forEach(g => { gc[g] = (gc[g]||0)+1; }));
+  const sorted = Object.entries(gc).sort((a,b)=>b[1]-a[1]);
+  const el = document.getElementById('genreList');
+  el.innerHTML = `<div class="genre-tag-sidebar ${!currentGenreFilter?'active':''}" onclick="setGenreFilter('', this)">
+    <span class="genre-dot" style="background:var(--text3)"></span>全ジャンル</div>`;
+  sorted.forEach(([g, cnt]) => {
+    const color = SPINE_COLORS[Math.abs(hashStr(g)) % SPINE_COLORS.length];
+    el.innerHTML += `<div class="genre-tag-sidebar ${currentGenreFilter===g?'active':''}" onclick="setGenreFilter('${escAttr(g)}', this)">
+      <span class="genre-dot" style="background:${color}"></span>${escHtml(g)}
+      <span style="margin-left:auto;font-size:11px;color:var(--text3);">${cnt}</span></div>`;
+  });
+}
+
+// ═══════════════════════════════════════════════
+// Filters
+// ═══════════════════════════════════════════════
+function setFilter(val, el) {
+  currentFilter = val;
+  document.querySelectorAll('.filter-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function setStarFilter(val, el) {
+  currentStarFilter = val;
+  document.querySelectorAll('.star-btn').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function setGenreFilter(val) {
+  currentGenreFilter = val;
+  buildGenreSidebar();
+  render();
+}
+
+function setView(v) {
+  currentView = v;
+  document.getElementById('gridBtn').classList.toggle('active', v==='grid');
+  document.getElementById('listBtn').classList.toggle('active', v==='list');
+  render();
+}
+
+// ═══════════════════════════════════════════════
+// Edit modal
+// ═══════════════════════════════════════════════
+function openEdit(id) {
+  const m = allMangas.find(x => x.id === id);
+  if (!m) return;
+  editingId = id;
+  const color = getSpineColor(m.title);
+  document.getElementById('editModalSpine').style.background = color;
+  document.getElementById('editModalTitle').textContent = m.title;
+  document.getElementById('editTitle').value = m.title;
+  document.getElementById('editAuthor').value = m.author || '';
+  document.getElementById('editMemo').value = m.memo || '';
+  document.getElementById('editComplete').checked = !!m.complete;
+  buildStarPicker(m.rating || 0);
+  buildGenrePicker(m.genres || []);
+  selectedVols = new Set(m.ownedVols || []);
+  document.getElementById('editVolMax').value = m.volMax || '';
+  rebuildVolGrid();
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function openAddSingle() {
+  editingId = null;
+  document.getElementById('editModalSpine').style.background = SPINE_COLORS[0];
+  document.getElementById('editModalTitle').textContent = '新規作品';
+  document.getElementById('editTitle').value = '';
+  document.getElementById('editAuthor').value = '';
+  document.getElementById('editMemo').value = '';
+  document.getElementById('editComplete').checked = false;
+  selectedVols = new Set();
+  document.getElementById('editVolMax').value = '';
+  buildStarPicker(0);
+  buildGenrePicker([]);
+  rebuildVolGrid();
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.add('hidden');
+  editingId = null;
+}
+
+function buildStarPicker(current) {
+  const el = document.getElementById('editStarPicker');
+  el.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const span = document.createElement('span');
+    span.className = 'star-pick ' + (i <= current ? 'active' : 'inactive');
+    span.textContent = '★';
+    span.dataset.val = i;
+    span.onclick = () => {
+      const v = parseInt(span.dataset.val);
+      document.querySelectorAll('.star-pick').forEach((s, idx) => {
+        s.className = 'star-pick ' + (idx < v ? 'active' : 'inactive');
+      });
+    };
+    el.appendChild(span);
+  }
+}
+
+function buildGenrePicker(current) {
+  const allG = new Set(GENRES);
+  allMangas.forEach(m => (m.genres||[]).forEach(g => allG.add(g)));
+  const el = document.getElementById('editGenrePicker');
+  el.innerHTML = '';
+  [...allG].forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'genre-pick-btn' + (current.includes(g) ? ' active' : '');
+    btn.textContent = g;
+    btn.type = 'button';
+    btn.onclick = () => btn.classList.toggle('active');
+    el.appendChild(btn);
+  });
+}
+
+function addCustomGenre(g) {
+  if (!g) return;
+  const el = document.getElementById('editGenrePicker');
+  const existing = [...el.querySelectorAll('.genre-pick-btn')].find(b => b.textContent === g);
+  if (existing) { existing.classList.add('active'); }
+  else {
+    const btn = document.createElement('button');
+    btn.className = 'genre-pick-btn active';
+    btn.textContent = g;
+    btn.type = 'button';
+    btn.onclick = () => btn.classList.toggle('active');
+    el.appendChild(btn);
+  }
+  document.getElementById('editGenreCustom').value = '';
+}
+
+function getSelectedGenres() { return [...document.querySelectorAll('.genre-pick-btn.active')].map(b => b.textContent); }
+function getSelectedRating() { return [...document.querySelectorAll('.star-pick.active')].length; }
+
+function rebuildVolGrid() {
+  const max = parseInt(document.getElementById('editVolMax').value) || 0;
+  const grid = document.getElementById('editVolGrid');
+  grid.innerHTML = '';
+  if (max <= 0) {
+    grid.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">総巻数を入力すると巻ごとに管理できます</div>';
+    return;
+  }
+  for (let i = 1; i <= Math.min(max, 200); i++) {
+    const cell = document.createElement('div');
+    cell.className = 'vol-cell' + (selectedVols.has(i) ? ' owned' : '');
+    cell.textContent = i;
+    cell.onclick = () => {
+      if (selectedVols.has(i)) { selectedVols.delete(i); cell.classList.remove('owned'); }
+      else { selectedVols.add(i); cell.classList.add('owned'); }
+    };
+    grid.appendChild(cell);
+  }
+  if (max > 200) grid.innerHTML += `<div style="color:var(--text3);font-size:11px;grid-column:1/-1;padding:4px;">（200巻まで個別管理）</div>`;
+}
+
+function selectAllVols() {
+  const max = parseInt(document.getElementById('editVolMax').value) || 0;
+  for (let i = 1; i <= max; i++) selectedVols.add(i);
+  rebuildVolGrid();
+}
+function clearAllVols() { selectedVols.clear(); rebuildVolGrid(); }
+
+async function saveManga() {
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+
+  const now = Date.now();
+  const id = editingId || ('m_' + now + '_' + Math.random().toString(36).slice(2));
+  const existing = allMangas.find(x => x.id === id) || {};
+
+  const item = {
+    ...existing, id, title,
+    author: document.getElementById('editAuthor').value.trim(),
+    genres: getSelectedGenres(),
+    rating: getSelectedRating(),
+    memo: document.getElementById('editMemo').value.trim(),
+    complete: document.getElementById('editComplete').checked,
+    volMax: parseInt(document.getElementById('editVolMax').value) || 0,
+    ownedVols: [...selectedVols].sort((a,b)=>a-b),
+    updated: now,
+    added: existing.added || now,
+  };
+
+  await dbPut(item);
+  if (editingId) {
+    const idx = allMangas.findIndex(x => x.id === id);
+    if (idx >= 0) allMangas[idx] = item;
+  } else {
+    allMangas.push(item);
+  }
+
+  closeEditModal();
+  updateCounts();
+  render();
+  showToast('保存しました ✓', 'success');
+  schedulePush();
+}
+
+async function deleteManga() {
+  if (!editingId) return;
+  if (!confirm('この作品を削除しますか？')) return;
+  await dbDelete(editingId);
+  allMangas = allMangas.filter(x => x.id !== editingId);
+  closeEditModal();
+  updateCounts();
+  render();
+  showToast('削除しました');
+  schedulePush();
+}
+
+// ═══════════════════════════════════════════════
+// Import
+// ═══════════════════════════════════════════════
+function openImport() {
+  document.getElementById('importText').value = '';
+  document.getElementById('importPreview').textContent = '';
+  document.getElementById('importModal').classList.remove('hidden');
+}
+function closeImport() { document.getElementById('importModal').classList.add('hidden'); }
+
+function updateImportPreview() {
+  const lines = document.getElementById('importText').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const existing = new Set(allMangas.map(m=>m.title));
+  const newOnes = lines.filter(l => !existing.has(l));
+  document.getElementById('importPreview').textContent = `${lines.length}行 → 新規: ${newOnes.length}件 / 既存スキップ: ${lines.length - newOnes.length}件`;
+}
+
+async function doImport() {
+  const lines = document.getElementById('importText').value.split('\n').map(l=>l.trim()).filter(Boolean);
+  const existing = new Set(allMangas.map(m=>m.title));
+  const now = Date.now();
+  const newItems = lines.filter(t => !existing.has(t)).map((t, i) => ({
+    id: 'm_' + (now + i) + '_' + Math.random().toString(36).slice(2),
+    title: t, author: '', genres: [], rating: 0, memo: '',
+    complete: false, volMax: 0, ownedVols: [],
+    added: now + i, updated: now + i,
+  }));
+
+  if (newItems.length === 0) { showToast('追加できる新規作品がありません', 'error'); return; }
+
+  document.getElementById('loadingOverlay').classList.remove('hidden');
+  document.getElementById('loadingText').textContent = `${newItems.length}件を追加中…`;
+
+  await dbPutMany(newItems);
+  allMangas = allMangas.concat(newItems);
+
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  closeImport();
+  updateCounts();
+  render();
+  showToast(`${newItems.length}件を追加しました ✓`, 'success');
+  schedulePush();
+}
+
+// ═══════════════════════════════════════════════
+// Export (local JSON backup)
+// ═══════════════════════════════════════════════
+function exportLocal() {
+  const json = JSON.stringify(allMangas, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `manga-shelf-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('エクスポートしました ✓', 'success');
+}
+
+// ═══════════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════════
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return s.replace(/'/g,"\\'"); }
+function hashStr(s) { let h=0; for(const c of s) h=(h*31+c.charCodeAt(0))&0xffffffff; return h; }
+
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.className = ''; }, 2500);
+}
+
+init();
+</script>
+</body>
+</html>
