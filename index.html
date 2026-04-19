@@ -402,7 +402,8 @@
       <span id="syncText">未接続</span>
     </div>
     <button class="btn" id="loginBtn" onclick="handleAuth()">Googleログイン</button>
-    <button class="btn" onclick="openImport()">＋ インポート</button>
+    <button class="btn" onclick="openImport()">＋ テキスト取込</button>
+    <button class="btn" onclick="importJSON()">📂 JSONインポート</button>
     <button class="btn" onclick="exportLocal()">エクスポート</button>
     <button class="btn" onclick="openAddSingle()">＋ 1作品追加</button>
   </div>
@@ -471,6 +472,19 @@
       <button class="modal-close" onclick="closeEditModal()">✕</button>
     </div>
     <div class="modal-body">
+      <!-- Auto-fetch & external links -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn sync" onclick="fetchGoogleBooks()" id="fetchGBBtn">📖 情報を自動取得</button>
+        <button class="btn" onclick="openAmazon()">🔍 Amazonで検索</button>
+        <button class="btn" onclick="openRakuten()">🔍 楽天で検索</button>
+      </div>
+      <div id="fetchStatus" style="font-size:12px;color:var(--text3);display:none;"></div>
+
+      <!-- Thumbnail -->
+      <div id="editThumbnailWrap" style="display:none;text-align:center;">
+        <img id="editThumbnail" src="" style="max-height:160px;border-radius:6px;border:1px solid var(--border);">
+      </div>
+
       <div class="field-group">
         <div class="field-label">タイトル</div>
         <input type="text" class="field-input" id="editTitle">
@@ -478,6 +492,11 @@
       <div class="field-group">
         <div class="field-label">作者</div>
         <input type="text" class="field-input" id="editAuthor" placeholder="任意">
+      </div>
+      <!-- Description (from Google Books) -->
+      <div class="field-group">
+        <div class="field-label">あらすじ</div>
+        <textarea class="field-textarea" id="editDescription" placeholder="自動取得で入力されます" style="min-height:60px;"></textarea>
       </div>
       <div class="field-group">
         <div class="field-label">ジャンル（複数選択可）</div>
@@ -962,6 +981,7 @@ function createCard(m) {
   div.onclick = () => openEdit(m.id);
   div.innerHTML = `
     <div class="card-spine" style="background:${color};"></div>
+    ${m.thumbnail ? `<div style="text-align:center;padding:8px 8px 0;"><img src="${escHtml(m.thumbnail)}" style="max-height:100px;border-radius:4px;"></div>` : ''}
     <div class="card-body">
       <div class="card-title">${escHtml(m.title)}</div>
       <div class="card-meta">
@@ -1042,7 +1062,16 @@ function openEdit(id) {
   document.getElementById('editTitle').value = m.title;
   document.getElementById('editAuthor').value = m.author || '';
   document.getElementById('editMemo').value = m.memo || '';
+  document.getElementById('editDescription').value = m.description || '';
   document.getElementById('editComplete').checked = !!m.complete;
+  // Thumbnail
+  if (m.thumbnail) {
+    document.getElementById('editThumbnail').src = m.thumbnail;
+    document.getElementById('editThumbnailWrap').style.display = 'block';
+  } else {
+    document.getElementById('editThumbnailWrap').style.display = 'none';
+  }
+  document.getElementById('fetchStatus').style.display = 'none';
   buildStarPicker(m.rating || 0);
   buildGenrePicker(m.genres || []);
   selectedVols = new Set(m.ownedVols || []);
@@ -1058,7 +1087,10 @@ function openAddSingle() {
   document.getElementById('editTitle').value = '';
   document.getElementById('editAuthor').value = '';
   document.getElementById('editMemo').value = '';
+  document.getElementById('editDescription').value = '';
   document.getElementById('editComplete').checked = false;
+  document.getElementById('editThumbnailWrap').style.display = 'none';
+  document.getElementById('fetchStatus').style.display = 'none';
   selectedVols = new Set();
   document.getElementById('editVolMax').value = '';
   buildStarPicker(0);
@@ -1145,6 +1177,92 @@ function rebuildVolGrid() {
   if (max > 200) grid.innerHTML += `<div style="color:var(--text3);font-size:11px;grid-column:1/-1;padding:4px;">（200巻まで個別管理）</div>`;
 }
 
+// ═══════════════════════════════════════════════
+// Google Books API
+// ═══════════════════════════════════════════════
+async function fetchGoogleBooks() {
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+
+  const statusEl = document.getElementById('fetchStatus');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '検索中…';
+  document.getElementById('fetchGBBtn').disabled = true;
+
+  try {
+    const query = encodeURIComponent(title + ' manga');
+    const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&langRestrict=ja&maxResults=5`);
+    const data = await res.json();
+
+    if (!data.items || data.items.length === 0) {
+      // Retry without "manga"
+      const res2 = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=5`);
+      const data2 = await res2.json();
+      if (!data2.items || data2.items.length === 0) {
+        statusEl.textContent = '該当する書籍が見つかりませんでした';
+        document.getElementById('fetchGBBtn').disabled = false;
+        return;
+      }
+      data.items = data2.items;
+    }
+
+    // Find best match
+    const best = data.items.find(i => {
+      const t = (i.volumeInfo.title || '').toLowerCase();
+      return t.includes(title.toLowerCase()) || title.toLowerCase().includes(t);
+    }) || data.items[0];
+
+    const info = best.volumeInfo;
+
+    // Author
+    if (info.authors && info.authors.length > 0 && !document.getElementById('editAuthor').value.trim()) {
+      document.getElementById('editAuthor').value = info.authors.join(', ');
+    }
+
+    // Description
+    if (info.description && !document.getElementById('editDescription').value.trim()) {
+      // Strip HTML tags
+      const desc = info.description.replace(/<[^>]*>/g, '');
+      document.getElementById('editDescription').value = desc;
+    }
+
+    // Thumbnail
+    if (info.imageLinks) {
+      const thumb = info.imageLinks.thumbnail || info.imageLinks.smallThumbnail || '';
+      if (thumb) {
+        const secureThumb = thumb.replace('http://', 'https://');
+        document.getElementById('editThumbnail').src = secureThumb;
+        document.getElementById('editThumbnailWrap').style.display = 'block';
+      }
+    }
+
+    // Publisher info
+    let extra = [];
+    if (info.publisher) extra.push('出版社: ' + info.publisher);
+    if (info.pageCount) extra.push(info.pageCount + 'ページ');
+    if (info.publishedDate) extra.push('発売: ' + info.publishedDate);
+
+    statusEl.textContent = '取得完了 ✓' + (extra.length > 0 ? ' — ' + extra.join(' / ') : '');
+
+  } catch (err) {
+    console.error('Google Books error:', err);
+    statusEl.textContent = 'エラー: ' + err.message;
+  }
+  document.getElementById('fetchGBBtn').disabled = false;
+}
+
+function openAmazon() {
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+  window.open(`https://www.amazon.co.jp/s?k=${encodeURIComponent(title + ' 漫画')}&i=stripbooks`, '_blank');
+}
+
+function openRakuten() {
+  const title = document.getElementById('editTitle').value.trim();
+  if (!title) { showToast('タイトルを入力してください', 'error'); return; }
+  window.open(`https://search.rakuten.co.jp/search/mall/${encodeURIComponent(title + ' 漫画')}/?l-id=s_search`, '_blank');
+}
+
 function selectAllVols() {
   const max = parseInt(document.getElementById('editVolMax').value) || 0;
   for (let i = 1; i <= max; i++) selectedVols.add(i);
@@ -1166,6 +1284,8 @@ async function saveManga() {
     genres: getSelectedGenres(),
     rating: getSelectedRating(),
     memo: document.getElementById('editMemo').value.trim(),
+    description: document.getElementById('editDescription').value.trim(),
+    thumbnail: (document.getElementById('editThumbnailWrap').style.display !== 'none' ? document.getElementById('editThumbnail').src : '') || existing.thumbnail || '',
     complete: document.getElementById('editComplete').checked,
     volMax: parseInt(document.getElementById('editVolMax').value) || 0,
     ownedVols: [...selectedVols].sort((a,b)=>a-b),
@@ -1242,6 +1362,55 @@ async function doImport() {
   render();
   showToast(`${newItems.length}件を追加しました ✓`, 'success');
   schedulePush();
+}
+
+// ═══════════════════════════════════════════════
+// JSON Import (from scanner)
+// ═══════════════════════════════════════════════
+function importJSON() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    document.getElementById('loadingText').textContent = 'JSONを読み込み中…';
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!Array.isArray(data)) {
+        showToast('JSONの形式が正しくありません', 'error');
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        return;
+      }
+
+      const existing = new Set(allMangas.map(m => m.title));
+      const newItems = data.filter(d => !existing.has(d.title));
+
+      if (newItems.length === 0) {
+        showToast('追加できる新規作品がありません', 'error');
+        document.getElementById('loadingOverlay').classList.add('hidden');
+        return;
+      }
+
+      await dbPutMany(newItems);
+      allMangas = allMangas.concat(newItems);
+
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      updateCounts();
+      render();
+      showToast(`${newItems.length}件をJSONからインポートしました ✓`, 'success');
+      schedulePush();
+    } catch (err) {
+      document.getElementById('loadingOverlay').classList.add('hidden');
+      showToast('JSONの読み込みに失敗: ' + err.message, 'error');
+    }
+  };
+  input.click();
 }
 
 // ═══════════════════════════════════════════════
